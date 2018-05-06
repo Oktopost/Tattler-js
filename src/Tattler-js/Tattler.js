@@ -148,7 +148,7 @@
 			{
 				
 				this._callbacks.success.push(callback);
-			}
+			};
 			
 			requestObject.prototype.onFail = function(callback)
 			{
@@ -247,11 +247,10 @@
 			socket: {
 				connected: function () {
 					requestChannels();
-					
 					log('warn', 'connected to socket');
 				},
 				disconnected: function () {
-					log('error', 'disconnected from socket');
+					log('warn', 'disconnected from socket');
 					for (var i in manufactory.channels) {
 						if (manufactory.channels.hasOwnProperty(i)) {
 							manufactory.channels[i] = false;
@@ -518,6 +517,16 @@
 			}
 		};
 		
+		var disconnect = function()
+		{
+			if (manufactory.socket === null) {
+				return;
+			}
+			
+			manufactory.socket.disconnect();
+			manufactory.socket = null;
+		};
+		
 		var getJWT = function (onSuccess, onFail) {
 			if (typeof options.auth !== 'undefined')
 			{
@@ -592,6 +601,7 @@
 		this.addChannel = addChannel;
 		this.removeChannel = removeChannel;
 		this.run = init;
+		this.disconnect = disconnect;
 	};
 	
 	window.TattlerFactory = TattlerFactory;
