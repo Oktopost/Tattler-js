@@ -35,72 +35,153 @@
 		return result;
 	}
 	
+	var NativeAjax = function ()
+	{
+		this._methods = {
+			get: 'GET',
+			post: 'POST'
+		};
+		
+		this.prototype._serialize =  function (obj, prefix)
+		{
+			var str = [], p;
+			for (p in obj)
+			{
+				if (obj.hasOwnProperty(p))
+				{
+					var k = prefix ? prefix + '[' + p + ']' : p, v = obj[p];
+					str.push((v !== null && typeof v === 'object') ?
+					serialize(v, k) :
+					encodeURIComponent(k) + '=' + encodeURIComponent(v));
+				}
+			}
+			return str.join('&');
+		};
+		
+		this.prototype._request = function(type, url, params)
+		{
+			var requestObject = function()
+			{
+				classify(this);
+				
+				this._response = {};
+				this._isSuccess = false;
+				this._callbacks = {
+					success: [],
+					fail: [],
+					complete: []
+				};
+				
+				this._xmlhttp = new XMLHttpRequest();
+				this._xmlhttp.onreadystatechange = this._onReadyStateChange;
+				
+				var data = '';
+				
+				if (type === 'GET')
+				{
+					var glue = '?';
+					
+					if (url.match(/\?/))
+					{
+						glue = '&';
+					}
+					
+					url += glue + this._serialize(data);
+					data = '';
+				}
+				else
+				{
+					data = JSON.stringify(params);
+				}
+				
+				this._xmlhttp.open(type, url, true);
+				this._xmlhttp.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+				
+				return this._xmlhttp.send(data);
+			};
+			
+			requestObject.prototype._onReadyStateChange = function ()
+			{
+				if (this._xmlhttp.readyState === XMLHttpRequest.DONE)
+				{
+					if (this._xmlhttp.status >= 200 && this._xmlhttp.status < 300)
+					{
+						var resolved;
+						
+						try
+						{
+							resolved = JSON.parse(this._xmlhttp.responseText);
+						}
+						catch(e)
+						{
+							resolved = this._xmlhttp.responseText;
+						}
+						
+						foreach(this._callbacks.success, this, function (callback)
+						{
+							callback(resolved);
+						});
+						
+						foreach(this._callbacks.complete, this, function (callback)
+						{
+							callback(true);
+						});
+					}
+					else
+					{
+						var payload = this._xmlhttp.response;
+						
+						foreach(this._callbacks.fail, this, function (callback)
+						{
+							callback(payload);
+						});
+						
+						foreach(this._callbacks.complete, this, function (callback)
+						{
+							callback(false);
+						});
+					}
+				}
+			};
+			
+			requestObject.prototype.onDone = function(callback)
+			{
+				
+				this._callbacks.success.push(callback);
+			}
+			
+			requestObject.prototype.onFail = function(callback)
+			{
+				
+				this._callbacks.fail.push(callback);
+			};
+			
+			requestObject.prototype.onComplete = function(callback)
+			{
+				
+				this._callbacks.complete.push(callback);
+			};
+			
+			return new requestObject(type, url, params);
+		};
+		
+		this.prototype.get = function(url, params)
+		{
+			return this._request(this._methods.get, url, params);
+		};
+		
+		this.prototype.post = function(url, params)
+		{
+			return this._request(this._methods.post, url, params);
+		};
+	};
+	
 	function guid() {
 		function s4() {
 			return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
 		}
 		
 		return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
-	}
-	
-	function ajax(type, url, data, onSuccess, onError, onComplete) {
-		var serialize = function (obj, prefix) {
-			var str = [], p;
-			for (p in obj) {
-				if (obj.hasOwnProperty(p)) {
-					var k = prefix ? prefix + "[" + p + "]" : p, v = obj[p];
-					str.push((v !== null && typeof v === "object") ?
-					serialize(v, k) :
-					encodeURIComponent(k) + "=" + encodeURIComponent(v));
-				}
-			}
-			return str.join("&");
-		};
-		
-		var xmlhttp = new XMLHttpRequest();
-		
-		xmlhttp.onreadystatechange = function () {
-			if (xmlhttp.readyState === XMLHttpRequest.DONE) {
-				if (xmlhttp.status >= 200 && xmlhttp.status < 300) {
-					if (typeof onSuccess === 'function') {
-						onSuccess(JSON.parse(xmlhttp.responseText));
-					}
-					
-					if (typeof onComplete === 'function') {
-						onComplete(true);
-					}
-				}
-				else {
-					if (typeof onError === 'function') {
-						onError(xmlhttp.response);
-					}
-					
-					if (typeof onComplete === 'function') {
-						onComplete(false);
-					}
-				}
-			}
-		};
-		
-		type = type.toUpperCase();
-		
-		if (type === 'GET') {
-			var glue = '?';
-			
-			if (url.match(/\?/)) {
-				glue = '&';
-			}
-			
-			url += glue + serialize(data);
-			data = '';
-		} else {
-			data = JSON.stringify(data);
-		}
-		
-		xmlhttp.open(type, url, true);
-		xmlhttp.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
-		
-		return xmlhttp.send(data);
 	}
 	
 	function isEmpty(obj) {
@@ -126,6 +207,8 @@
 	var Tattler = function (options) {
 		var messageIds = [];
 		var settings = extendConfig(defaults, options);
+		var ajaxImplementer = false;
+		
 		var callbacks = {
 			getWs: {
 				onSuccess: function (data)
@@ -282,6 +365,16 @@
 			typeof manufactory.handlers[namespace][event] !== 'undefined';
 		};
 		
+		var getAjax = function()
+		{
+			if (!ajaxImplementer)
+			{
+				return new NativeAjax();
+			}
+			
+			return ajaxImplementer;
+		};
+		
 		var subscribeChannel = function (channel, state) {
 			manufactory.socket.emit('subscribe', channel);
 			
@@ -304,20 +397,19 @@
 					}
 					else
 					{
-						ajax(settings.requests.channels,
-						settings.urls.channels,
+						getAjax()[settings.requests.channels](settings.urls.channels),
 						{
 							socketId: manufactory.socket.id,
 							channels: [channel]
-						},
+						}.onDone(
 						function (data) {
 							for (var i in data.channels) {
 								if (data.channels.hasOwnProperty(i)) {
 									subscribeChannel(data.channels[i], state);
 								}
 							}
-						},
-						callbacks.getChannels.onError);
+						})
+						.onFail(callbacks.getChannels.onError);
 					}
 					
 				} else {
@@ -399,6 +491,12 @@
 			}
 		};
 		
+		var setAjaxImplementer = function(library)
+		{
+			ajaxImplementer = library;
+		};
+		
+		
 		var debug = function () {
 			for (var item in logs) {
 				console[logs[item].type](logs[item].date, logs[item].data);
@@ -416,7 +514,7 @@
 			else
 			{
 				log('info', 'requesting WS url');
-				ajax(settings.requests.ws, settings.urls.ws, {}, callbacks.getWs.onSuccess, callbacks.getWs.onError);
+				getAjax()[settings.requests.ws](settings.urls.ws, {}).onDone(callbacks.getWs.onSuccess).onFail(callbacks.getWs.onError);
 			}
 		};
 		
@@ -427,9 +525,9 @@
 			}
 			else
 			{
-				ajax(settings.requests.auth, settings.urls.auth, {}, function (jqXHR) {
+				getAjax()[settings.requests.auth](settings.urls.auth, {}).onDone(function (jqXHR) {
 					onSuccess(jqXHR.token);
-				}, onFail);
+				}).onFail(onFail);
 			}
 		};
 		
@@ -471,14 +569,13 @@
 				}
 			}
 			
-			ajax(settings.requests.channels,
-			settings.urls.channels,
+			getAjax()[settings.requests.channels](settings.urls.channels,
 			{
 				socketId: socketId,
 				channels: savedChannels
-			},
-			callbacks.getChannels.onSuccess,
-			callbacks.getChannels.onError);
+			})
+			.onDone(callbacks.getChannels.onSuccess)
+			.onFail(callbacks.getChannels.onError);
 		};
 		
 		if (settings.autoConnect) {
@@ -487,6 +584,8 @@
 		
 		log('info', "creating socket's stuff...");
 		
+		
+		this.setAjaxImplementer = setAjaxImplementer;
 		this.debug = debug;
 		this.addHandler = addHandler;
 		this.removeHandler = removeHandler;

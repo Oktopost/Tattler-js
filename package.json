@@ -1,6 +1,6 @@
 {
 	"name": "oktopost-websocket-js-client",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"description": "Tattler-PHP Websocket js connector",
 	"scripts": {},
 	"author": "Daniel Podrabinek <dpodrabinek@oktopost.com>",

@@ -3,16 +3,16 @@ var concat = require('gulp-concat');
 var rename = require('gulp-rename');
 var uglify = require('gulp-uglify');
 
-var TATTLER_JS = 'src/Tattler-js/tattler.js';
-var SOCKET_IO = 'node_modules/socket.io-client/dist/socket.io.js';
+
+var PATH = 'src/Tattler-js/';
 
 var ALL_FILES = [
-	TATTLER_JS,
-	SOCKET_IO
+	PATH + 'Tattler.js'
 ];
 
+
 var build = function () {
-	gulp.src(TATTLER_JS)
+	gulp.src(ALL_FILES)
 		.pipe(concat('tattler.min.js'))
 		.pipe(uglify())
 		.pipe(gulp.dest('dist'));
