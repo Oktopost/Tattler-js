@@ -1,0 +1,19 @@
+# IDE Folders
+/.buildpath
+/.project
+/.settings
+/.idea
+
+# OS Folders
+.DS_Store
+
+# Node
+/node_modules/*
+
+# Test results
+/coverage
+
+# Local files
+npm-debug.log
+/.namespace.json
+/test.js
