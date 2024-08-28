@@ -1,32 +1,34 @@
-(function () {
+(function ()
+{
 	'use strict';
 	
 	
-	var defaults = {
-		ws: undefined,
-		auth: undefined,
-		urls: {
-			ws: '/_tattler/ws',
+	let defaults = {
+		ws:                undefined,
+		auth:              undefined,
+		urls:              {
+			ws:       '/_tattler/ws',
 			channels: '/_tattler/channels',
-			auth: '/_tattler/auth'
+			auth:     '/_tattler/auth'
 		},
-		requests: {
-			ws: 'get',
+		requests:          {
+			ws:       'get',
 			channels: 'get',
-			auth: 'get'
+			auth:     'get'
 		},
-		readyCallback: false,
+		readyCallback:     false,
 		readyCallbackOnce: false,
-		autoConnect: true, // automatically init plugin
-		debug: false // show messages in console
+		autoConnect:       true, // automatically init plugin
+		debug:             false // show messages in console
 	};
 	
-	var tattlerInstances = {};
+	let tattlerInstances = {};
 	
-	function extendConfig(defaultConfig, newConfig) {
-		var result = defaultConfig;
+	function extendConfig(defaultConfig, newConfig)
+	{
+		let result = defaultConfig;
 		
-		for (var key in newConfig) {
+		for (let key in newConfig) {
 			if (newConfig.hasOwnProperty(key)) {
 				result[key] = newConfig[key];
 			}
@@ -35,21 +37,21 @@
 		return result;
 	}
 	
-	var NativeAjax = function ()
+	const NativeAjax = function ()
 	{
-		this._methods = {
+		let methods = {
 			get: 'GET',
 			post: 'POST'
 		};
 		
-		this.prototype._serialize =  function (obj, prefix)
+		const serialize =  function (obj, prefix)
 		{
-			var str = [], p;
+			let str = [], p;
 			for (p in obj)
 			{
 				if (obj.hasOwnProperty(p))
 				{
-					var k = prefix ? prefix + '[' + p + ']' : p, v = obj[p];
+					let k = prefix ? prefix + '[' + p + ']' : p, v = obj[p];
 					str.push((v !== null && typeof v === 'object') ?
 					serialize(v, k) :
 					encodeURIComponent(k) + '=' + encodeURIComponent(v));
@@ -58,35 +60,32 @@
 			return str.join('&');
 		};
 		
-		this.prototype._request = function(type, url, params)
+		this._request = function(type, url, params)
 		{
-			var requestObject = function()
+			let callbacks =
 			{
-				classify(this);
-				
-				this._response = {};
-				this._isSuccess = false;
-				this._callbacks = {
-					success: [],
-					fail: [],
-					complete: []
-				};
-				
+				success: [],
+				fail: [],
+				complete: []
+			};
+			
+			const requestObject = function()
+			{				
 				this._xmlhttp = new XMLHttpRequest();
 				this._xmlhttp.onreadystatechange = this._onReadyStateChange;
 				
-				var data = '';
+				let data = '';
 				
 				if (type === 'GET')
 				{
-					var glue = '?';
+					let glue = '?';
 					
 					if (url.match(/\?/))
 					{
 						glue = '&';
 					}
 					
-					url += glue + this._serialize(data);
+					url += glue + serialize(data);
 					data = '';
 				}
 				else
@@ -106,7 +105,7 @@
 				{
 					if (this._xmlhttp.status >= 200 && this._xmlhttp.status < 300)
 					{
-						var resolved;
+						let resolved;
 						
 						try
 						{
@@ -117,75 +116,79 @@
 							resolved = this._xmlhttp.responseText;
 						}
 						
-						foreach(this._callbacks.success, this, function (callback)
+						for(let s in callbacks.success)
 						{
-							callback(resolved);
-						});
+							callbacks[s](resolved);
+						}
 						
-						foreach(this._callbacks.complete, this, function (callback)
+						for(let c in callbacks.complete)
 						{
-							callback(true);
-						});
+							callbacks[c](true);
+						}
 					}
 					else
 					{
-						var payload = this._xmlhttp.response;
+						let payload = this._xmlhttp.response;
 						
-						foreach(this._callbacks.fail, this, function (callback)
+						for(let f in callbacks.fail)
 						{
-							callback(payload);
-						});
+							callbacks[f](payload);
+						}
 						
-						foreach(this._callbacks.complete, this, function (callback)
+						for(let c in callbacks.complete)
 						{
-							callback(false);
-						});
+							callbacks[c](false);
+						}
 					}
 				}
 			};
 			
-			requestObject.prototype.onDone = function(callback)
+			requestObject.onDone = function(callback)
 			{
 				
-				this._callbacks.success.push(callback);
+				callbacks.success.push(callback);
 			};
 			
-			requestObject.prototype.onFail = function(callback)
+			requestObject.onFail = function(callback)
 			{
 				
-				this._callbacks.fail.push(callback);
+				callbacks.fail.push(callback);
 			};
 			
-			requestObject.prototype.onComplete = function(callback)
+			requestObject.onComplete = function(callback)
 			{
 				
-				this._callbacks.complete.push(callback);
+				callbacks.complete.push(callback);
 			};
 			
 			return new requestObject(type, url, params);
 		};
 		
-		this.prototype.get = function(url, params)
+		this.get = function(url, params)
 		{
-			return this._request(this._methods.get, url, params);
+			return this._request(methods.get, url, params);
 		};
 		
-		this.prototype.post = function(url, params)
+		this.post = function(url, params)
 		{
-			return this._request(this._methods.post, url, params);
+			return this._request(methods.post, url, params);
 		};
 	};
 	
-	function guid() {
-		function s4() {
+	function guid()
+	{
+		function s4()
+		{
 			return Math.floor((1 + Math.random()) * 0x10000).toString(16).substring(1);
 		}
 		
 		return s4() + s4() + '-' + s4() + '-' + s4() + '-' + s4() + '-' + s4() + s4() + s4();
 	}
 	
-	function isEmpty(obj) {
-		for (var prop in obj) {
+	function isEmpty(obj)
+	{
+		for (let prop in obj)
+		{
 			if (obj.hasOwnProperty(prop))
 				return false;
 		}
@@ -193,38 +196,40 @@
 		return JSON.stringify(obj) === JSON.stringify({});
 	}
 	
-	var TattlerFactory = {
-		getInstance: function (instanceName) {
-			return tattlerInstances[instanceName];
-		},
-		create: function (config) {
-			var instance = new Tattler(config);
-			tattlerInstances[guid()] = instance;
-			return instance;
-		}
-	};
+	const TattlerFactory =
+		{
+			getInstance: function (instanceName) {
+				return tattlerInstances[instanceName];
+			},
+			create: function (config) {
+				let instance = new Tattler(config);
+				tattlerInstances[guid()] = instance;
+				return instance;
+			}
+		};
 	
-	var Tattler = function (options) {
-		var messageIds = [];
-		var settings = extendConfig(defaults, options);
-		var ajaxImplementer = false;
+	const Tattler = function (options)
+	{
+		let messageIds = [];
+		const settings = extendConfig(defaults, options);
+		let ajaxImplementer = false;
 		
-		var callbacks = {
+		const callbacks = {
 			getWs: {
 				onSuccess: function (data)
-					{
-					   manufactory.server = data.ws;
-					   connectToSocket();
-					},
+						   {
+							   manufactory.server = data.ws;
+							   connectToSocket();
+						   },
 				
-				onError: function () 
-					{
-						log('error', 'Failed to get ws address');
-					}
+				onError: function ()
+						 {
+							 log('error', 'Failed to get ws address');
+						 }
 			},
 			getChannels: {
 				onSuccess: function (data) {
-					for (var i in data.channels) {
+					for (let i in data.channels) {
 						if (data.channels.hasOwnProperty(i)) {
 							addChannel(data.channels[i], true, true);
 						}
@@ -251,7 +256,7 @@
 				},
 				disconnected: function () {
 					log('warn', 'disconnected from socket');
-					for (var i in manufactory.channels) {
+					for (let i in manufactory.channels) {
 						if (manufactory.channels.hasOwnProperty(i)) {
 							manufactory.channels[i] = false;
 						}
@@ -264,11 +269,11 @@
 					
 					/** @namespace data.payload */
 					manufactory.socket.on('defaultEvent', function (data) {
-						var id = data.id || Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 30);
-						var handler = data.handler;
-						var namespace = data.namespace || 'global';
+						let id = data.id || Math.random().toString(36).replace(/[^a-z]+/g, '').substr(0, 30);
+						let handler = data.handler;
+						let namespace = data.namespace || 'global';
 						
-						for (var i = 0; i < 10; i++) {
+						for (let i = 0; i < 10; i++) {
 							if (!messageIds.hasOwnProperty(i)) {
 								break;
 							}
@@ -286,7 +291,7 @@
 						if (handlerExists(namespace, handler) === false) {
 							log('error', 'handler ' + handler + ' with namespace ' + namespace + ' not defined', data);
 						} else {
-							for (var funcKey=0; funcKey<manufactory.handlers[namespace][handler].length; funcKey++)
+							for (let funcKey=0; funcKey<manufactory.handlers[namespace][handler].length; funcKey++)
 							{
 								if (typeof data.payload === 'undefined') {
 									// backward compatibility to old version of Tattler backend
@@ -300,71 +305,75 @@
 				}
 			}
 		};
-		var manufactory = {
-			socket: null,
-			server: null,
-			port: null,
-			channels: {},
-			handlers: {
-				/** @namespace data.channel */
-				global: {
-					'console.log': [function (data) {
-						if (typeof data.force !== 'undefined') {
-							console.warn(data);
-							return;
-						}
-						
-						if (settings.debug === true) {
-							log('warn', '-------------------------------------------------------------');
-							log('warn', 'remote: ' + data.message);
-							log('warn', '-------------------------------------------------------------');
-						} else {
-							log('warn', 'remote', data.message);
-						}
-					}],
-					'alert': [function (data) {
-						var text;
-						if (typeof data.title !== 'undefined') {
-							text = data.title
-						}
-						
-						if (text !== '') {
-							text = '--------------------------' + text.toUpperCase() + '--------------------------';
-							text += "\n";
-						}
-						
-						text += data.message;
-						
-						alert(text);
-					}],
-					'confirm': [function (data) {
-						if (confirm(data.message)) {
-							if (data.yes !== undefined && typeof data.yes === 'function') {
-								data.yes();
-							}
-						} else {
-							if (data.no !== undefined && typeof data.no === 'function') {
-								window[data.no]();
-							}
-						}
-					}],
-					'addChannel': [function (data) {
-						addChannel(data.channel, false);
-					}],
-					'removeChannel': [function (data) {
-						removeChannel(data.channel);
-					}]
-				}
-			}
-		};
-		var logs = [];
 		
-		var handlerExists = function (namespace, event) {
+		const manufactory =
+			{
+				socket: null,
+				server: null,
+				port: null,
+				channels: {},
+				handlers: {
+					/** @namespace data.channel */
+					global: {
+						'console.log': [function (data) {
+							if (typeof data.force !== 'undefined') {
+								console.warn(data);
+								return;
+							}
+							
+							if (settings.debug === true) {
+								log('warn', '-------------------------------------------------------------');
+								log('warn', 'remote: ' + data.message);
+								log('warn', '-------------------------------------------------------------');
+							} else {
+								log('warn', 'remote', data.message);
+							}
+						}],
+						'alert': [function (data) {
+							let text;
+							if (typeof data.title !== 'undefined') {
+								text = data.title
+							}
+							
+							if (text !== '') {
+								text = '--------------------------' + text.toUpperCase() + '--------------------------';
+								text += "\n";
+							}
+							
+							text += data.message;
+							
+							alert(text);
+						}],
+						'confirm': [function (data) {
+							if (confirm(data.message)) {
+								if (data.yes !== undefined && typeof data.yes === 'function') {
+									data.yes();
+								}
+							} else {
+								if (data.no !== undefined && typeof data.no === 'function') {
+									window[data.no]();
+								}
+							}
+						}],
+						'addChannel': [function (data) {
+							addChannel(data.channel, false);
+						}],
+						'removeChannel': [function (data) {
+							removeChannel(data.channel);
+						}]
+					}
+				}
+			};
+		
+		let logs = [];
+		
+		const handlerExists = function (namespace, event)
+		{
 			return typeof manufactory.handlers[namespace] !== 'undefined' &&
 			typeof manufactory.handlers[namespace][event] !== 'undefined';
 		};
 		
-		var getAjax = function()
+		const getAjax = function()
 		{
 			if (!ajaxImplementer)
 			{
@@ -374,7 +383,8 @@
 			return ajaxImplementer;
 		};
 		
-		var subscribeChannel = function (channel, state) {
+		const subscribeChannel = function (channel, state)
+		{
 			manufactory.socket.emit('subscribe', channel);
 			
 			if (typeof state === 'undefined')
@@ -383,11 +393,14 @@
 			}
 		};
 		
-		var addChannel = function (channel, state, notAsync) {
-			if (typeof manufactory.channels[channel] === 'undefined' || manufactory.channels[channel] !== state) {
+		const addChannel = function (channel, state, notAsync)
+		{
+			if (typeof manufactory.channels[channel] === 'undefined' || manufactory.channels[channel] !== state)
+			{
 				manufactory.channels[channel] = state;
 				
-				if (manufactory.socket !== null) {
+				if (manufactory.socket !== null)
+				{
 					log('info', 'joining channel «' + channel + '»');
 					
 					if (typeof notAsync === 'boolean' && notAsync === true)
@@ -396,13 +409,12 @@
 					}
 					else
 					{
-						getAjax()[settings.requests.channels](settings.urls.channels),
+						getAjax()[settings.requests.channels](settings.urls.channels,
 						{
 							socketId: manufactory.socket.id,
 							channels: [channel]
-						}.onDone(
-						function (data) {
-							for (var i in data.channels) {
+						}).onDone(function (data) {
+							for (let i in data.channels) {
 								if (data.channels.hasOwnProperty(i)) {
 									subscribeChannel(data.channels[i], state);
 								}
@@ -411,25 +423,34 @@
 						.onFail(callbacks.getChannels.onError);
 					}
 					
-				} else {
+				}
+				else
+				{
 					log('info', 'adding channel «' + channel + '»');
 				}
-			} else {
+			}
+			else
+			{
 				log('error', 'channel «' + channel + '» already defined');
 			}
 		};
 		
-		var removeChannel = function (channel) {
-			if (typeof manufactory.channels[channel] === 'undefined') {
+		const removeChannel = function (channel)
+		{
+			if (typeof manufactory.channels[channel] === 'undefined')
+			{
 				log('error', 'failed to unsubscribe from «' + channel + '» - channel not defined');
-			} else {
+			}
+			else
+			{
 				delete(manufactory.channels[channel]);
 				manufactory.socket.emit('unsubscribe', channel);
 				log('warn', 'unsubscribed from «' + channel + '»')
 			}
 		};
 		
-		var addHandler = function (event, namespace, fn) {
+		const addHandler = function (event, namespace, fn)
+		{
 			if (typeof namespace === 'function') {
 				// backward compatibility with old handlers
 				fn = namespace;
@@ -437,11 +458,13 @@
 			}
 			
 			
-			if (typeof manufactory.handlers[namespace] === 'undefined') {
+			if (typeof manufactory.handlers[namespace] === 'undefined')
+			{
 				manufactory.handlers[namespace] = {};
 			}
 			
-			if (typeof manufactory.handlers[namespace][event] === 'undefined') {
+			if (typeof manufactory.handlers[namespace][event] === 'undefined')
+			{
 				manufactory.handlers[namespace][event] = [];
 			}
 			
@@ -449,7 +472,8 @@
 			log('info', 'added handler for event «' + event + '» in namespace «' + namespace + '»');
 		};
 		
-		var removeHandler = function(event, namespace) {
+		const removeHandler = function(event, namespace)
+		{
 			if (typeof manufactory.handlers[namespace] !== 'undefined' && typeof manufactory.handlers[namespace][event] !== 'undefined')
 			{
 				log('info', 'removed handler(s) for event «' + event + '» in namespace «' + namespace + '»');
@@ -461,15 +485,16 @@
 			}
 		};
 		
-		var log = function () {
-			var args = [];
-			var result = {};
+		const log = function ()
+		{
+			let args = [];
+			let result = {};
 			
-			for (var i = 0; i < arguments.length; i++) {
+			for (let i = 0; i < arguments.length; i++) {
 				args.push(arguments[i]);
 			}
 			
-			var type = args.shift();
+			let type = args.shift();
 			
 			result.type = type;
 			result.date = new Date();
@@ -479,7 +504,7 @@
 			
 			if (settings.debug === true) {
 				args.unshift('Tattler:');
-				for (var x in args) {
+				for (let x in args) {
 					if (typeof args[x] === 'object') {
 						console[type](args);
 						return;
@@ -490,19 +515,20 @@
 			}
 		};
 		
-		var setAjaxImplementer = function(library)
+		const setAjaxImplementer = function(library)
 		{
 			ajaxImplementer = library;
 		};
 		
 		
-		var debug = function () {
-			for (var item in logs) {
+		const debug = function ()
+		{
+			for (let item in logs) {
 				console[logs[item].type](logs[item].date, logs[item].data);
 			}
 		};
 		
-		var init = function ()
+		const init = function ()
 		{
 			if (typeof options.ws !== 'undefined')
 			{
@@ -517,7 +543,7 @@
 			}
 		};
 		
-		var disconnect = function()
+		const disconnect = function()
 		{
 			if (manufactory.socket === null) {
 				return;
@@ -527,7 +553,8 @@
 			manufactory.socket = null;
 		};
 		
-		var getJWT = function (onSuccess, onFail) {
+		const getJWT = function (onSuccess, onFail)
+		{
 			if (typeof options.auth !== 'undefined')
 			{
 				onSuccess(options.auth);
@@ -540,7 +567,8 @@
 			}
 		};
 		
-		var connectToSocket = function () {
+		const connectToSocket = function ()
+		{
 			if (manufactory.socket === null) {
 				if (manufactory.server === null) {
 					log('error', 'Failed to connect to socket: address unknown');
@@ -558,20 +586,28 @@
 					
 					log('info', 'connecting to socket at ' + manufactory.server);
 				});
-			} else {
+			}
+			else
+			{
 				log('error', 'socket already connected');
 			}
 		};
 		
-		var requestChannels = function () {
-			var socketId = manufactory.socket.io.engine.id;
-			var savedChannels = [];
+		const requestChannels = function ()
+		{
+			let socketId = manufactory.socket.id;
+			let savedChannels = [];
 			
-			if (isEmpty(manufactory.channels)) {
+			if (isEmpty(manufactory.channels))
+			{
 				log('log', 'requesting channels with socketId=' + socketId);
-			} else {
+			}
+			else
+			{
 				log('log', 'connecting to saved channels');
-				for (var room in manufactory.channels) {
+				
+				for (let room in manufactory.channels)
+				{
 					if (manufactory.channels.hasOwnProperty(room)) {
 						savedChannels.push(room);
 					}
@@ -606,14 +642,18 @@
 	
 	window.TattlerFactory = TattlerFactory;
 	
-	window.tattlerFactory = {
-		getInstance: function (instanceName) {
-			console.warn('tattlerFactory is deprecated, use TattlerFactory');
-			return TattlerFactory.getInstance(instanceName);
-		},
-		create: function (config) {
-			console.warn('tattlerFactory is deprecated, use TattlerFactory');
-			return TattlerFactory.create(config);
-		}
+	
+	window.tattlerFactory =
+	{
+		getInstance: function (instanceName)
+					 {
+						 console.warn('tattlerFactory is deprecated, use TattlerFactory');
+						 return TattlerFactory.getInstance(instanceName);
+					 },
+		create: function (config)
+					 {
+						 console.warn('tattlerFactory is deprecated, use TattlerFactory');
+						 return TattlerFactory.create(config);
+					 }
 	};
 })();
