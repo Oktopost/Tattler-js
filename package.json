@@ -1,9 +1,9 @@
 {
 	"name": "oktopost-websocket-js-client",
 	"version": "1.0.5",
-	"engines" : {
-		"npm" : ">=10",
-		"node" : ">=20.10"
+	"engines": {
+		"npm": ">=10",
+		"node": ">=20.10"
 	},
 	"description": "Tattler-PHP Websocket js connector",
 	"scripts": {
@@ -13,7 +13,7 @@
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/Oktopost/Tattler-js.git"
+		"url": "git+https://github.com/Oktopost/Tattler-js.git"
 	},
 	"dependencies": {
 		"socket.io-client": "^4.7.5"
